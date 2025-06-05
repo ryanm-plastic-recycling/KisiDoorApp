@@ -1,4 +1,6 @@
 // server.js
+import ejs from "ejs";
+import expressLayout from "express-ejs-layouts";
 import express from "express";
 import bodyParser from "body-parser";
 import crypto from "crypto";
@@ -8,6 +10,8 @@ import Twilio from "twilio";
 
 const app = express();
 app.use(bodyParser.json({ verify: rawBodySaver }));  
+app.set("view engine", "ejs");
+app.use(expressLayout);
 // We need the raw body for HMAC. rawBodySaver attaches raw buffer to req.
 
 const PORT = process.env.PORT || 3000;
@@ -28,6 +32,84 @@ function rawBodySaver(req, res, buf, encoding) {
     // Attach raw string for HMAC verification
     req.rawBody = buf.toString(encoding || "utf8");
   }
+}
+
+// ── Helper: Read All Recipients for Dashboard ─────────────────────────────────
+function getAllRecipients() {
+  try {
+    const data = fs.readFileSync(RECIPIENTS_FILE, "utf8");
+    return JSON.parse(data);
+  } catch {
+    return [];
+  }
+}
+
+// ── Route: Dashboard ──────────────────────────────────────────────────────────
+app.get("/", (req, res) => {
+  const recipients = getAllRecipients();
+  res.render("dashboard", { recipients });
+});
+
+// ── Route: Add Recipient ───────────────────────────────────────────────────────
+app.post("/recipients/add", (req, res) => {
+  const { name, phone } = req.body;
+  if (!name || !phone) return res.redirect("/");
+
+  const list = getAllRecipients();
+  list.push({ name, phone });
+  fs.writeFileSync(RECIPIENTS_FILE, JSON.stringify(list, null, 2));
+  res.redirect("/");
+});
+
+// ── Route: Delete Recipient ───────────────────────────────────────────────────
+app.post("/recipients/delete", (req, res) => {
+  const { phone } = req.body;
+  let list = getAllRecipients();
+  list = list.filter((r) => r.phone !== phone);
+  fs.writeFileSync(RECIPIENTS_FILE, JSON.stringify(list, null, 2));
+  res.redirect("/");
+});
+
+// ── Route: Lockdown All Main Doors ────────────────────────────────────────────
+const KISI_API_KEY = process.env.KISI_API_KEY || "";  
+// You need an Admin API key that has rights to call Lockdown endpoints.
+
+const MAIN_DOOR_IDS = [1234, 5678]; // ← Replace with your actual Lock IDs
+
+app.post("/lockdown", async (req, res) => {
+  if (!KISI_API_KEY) {
+    console.error("No KISI_API_KEY set in environment.");
+    return res.status(500).send("Server misconfiguration");
+  }
+  try {
+    for (const lockId of MAIN_DOOR_IDS) {
+      await TwilioFetch(`https://api.kisi.com/locks/${lockId}/lockdown`, "POST", {
+        Authorization: `KISI-LOGIN ${KISI_API_KEY}`
+      });
+    }
+    // After lockdown, notify via SMS
+    const msg = `🔒 All main doors lockdown activated at ${new Date().toISOString()}.`;
+    await broadcastSms(msg);
+    res.redirect("/");
+  } catch (err) {
+    console.error("Lockdown error:", err);
+    res.status(500).send("Failed to lockdown");
+  }
+});
+
+// ── Simple Fetch Wrapper using Twilio's node-fetch or built-in fetch ─────────
+import fetch from "node-fetch";
+
+async function TwilioFetch(url, method = "GET", headers = {}, body = {}) {
+  return fetch(url, {
+    method,
+    headers: {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      ...headers
+    },
+    body: method === "GET" ? undefined : JSON.stringify(body)
+  });
 }
 
 // ── Verify HMAC Signature ───────────────────────────────────────────────────────
