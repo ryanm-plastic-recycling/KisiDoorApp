@@ -26,6 +26,22 @@ const twClient = Twilio(TWILIO_SID, TWILIO_AUTH);
 
 // Path to our JSON config of recipients
 const RECIPIENTS_FILE = path.join(__dirname, "config", "recipients.json");
+const EVENTS_FILE = path.join(__dirname, "logs", "events.json");
+
+function loadEvents() {
+  try {
+    const data = fs.readFileSync(EVENTS_FILE, "utf8");
+    return JSON.parse(data);
+  } catch {
+    return [];
+  }
+}
+
+function addEvent(entry) {
+  const list = loadEvents();
+  list.unshift({ timestamp: new Date().toISOString(), ...entry });
+  fs.writeFileSync(EVENTS_FILE, JSON.stringify(list, null, 2));
+}
 
 // Track recent successful unlocks to detect door opens without a badge
 const recentUnlocks = new Map();
@@ -52,6 +68,15 @@ function getAllRecipients() {
 app.get("/", (req, res) => {
   const recipients = getAllRecipients();
   res.render("dashboard", { recipients });
+});
+
+app.get("/events", (req, res) => {
+  const q = (req.query.q || "").toLowerCase();
+  let events = loadEvents();
+  if (q) {
+    events = events.filter((e) => JSON.stringify(e).toLowerCase().includes(q));
+  }
+  res.render("events", { events, query: req.query.q || "" });
 });
 
 // ── Route: Add Recipient ───────────────────────────────────────────────────────
@@ -94,10 +119,41 @@ app.post("/lockdown", async (req, res) => {
     // After lockdown, notify via SMS
     const msg = `🔒 All main doors lockdown activated at ${new Date().toISOString()}.`;
     await broadcastSms(msg);
+    addEvent({ kind: "action", action: "lockdown" });
     res.redirect("/");
   } catch (err) {
     console.error("Lockdown error:", err);
     res.status(500).send("Failed to lockdown");
+  }
+});
+
+app.post("/locks/open", async (req, res) => {
+  const { lockId } = req.body;
+  if (!KISI_API_KEY || !lockId) return res.redirect("/");
+  try {
+    await TwilioFetch(`https://api.kisi.com/locks/${lockId}/unlock`, "POST", {
+      Authorization: `KISI-LOGIN ${KISI_API_KEY}`
+    });
+    addEvent({ kind: "action", action: "open", lockId });
+    res.redirect("/");
+  } catch (err) {
+    console.error("Open door error:", err);
+    res.status(500).send("Failed to open door");
+  }
+});
+
+app.post("/locks/lock", async (req, res) => {
+  const { lockId } = req.body;
+  if (!KISI_API_KEY || !lockId) return res.redirect("/");
+  try {
+    await TwilioFetch(`https://api.kisi.com/locks/${lockId}/lock`, "POST", {
+      Authorization: `KISI-LOGIN ${KISI_API_KEY}`
+    });
+    addEvent({ kind: "action", action: "lock", lockId });
+    res.redirect("/");
+  } catch (err) {
+    console.error("Lock door error:", err);
+    res.status(500).send("Failed to lock door");
   }
 });
 
@@ -155,6 +211,7 @@ async function broadcastSms(message) {
         body: personalized
       });
       console.log(`SMS sent to ${to}`);
+      addEvent({ kind: "sms", to, body: personalized });
     } catch (err) {
       console.error(`Failed to send SMS to ${to}:`, err);
     }
@@ -177,6 +234,8 @@ app.post("/api/kisi/webhook", (req, res) => {
   if (!event || !event.type) {
     return res.status(400).send("Invalid payload");
   }
+
+  addEvent({ kind: "kisi", event });
 
   // Record successful unlocks
   if (event.type === "lock.unlock" && event.success) {

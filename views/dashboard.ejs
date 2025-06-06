@@ -3,22 +3,29 @@
 <head>
   <meta charset="UTF-8" />
   <title>Kisi Security Dashboard</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 2rem; }
-    h1 { margin-bottom: 1rem; }
-    .section { margin-bottom: 2rem; }
-    label { display: block; margin-bottom: 0.5rem; }
-    input { margin-bottom: 1rem; width: 300px; }
-    button { padding: 0.5rem 1rem; }
-    .recipient { margin: 0.5rem 0; }
-  </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css">
 </head>
-<body>
-  <h1>Kisi Security Dashboard</h1>
+<body class="p-4">
+  <h1 class="mb-4">Kisi Security Dashboard</h1>
   <div class="section">
     <h2>Lockdown Controls</h2>
     <form action="/lockdown" method="POST">
-      <button type="submit" style="background-color:red;color:white;">🔒 Lockdown All Main Doors</button>
+      <button type="submit" class="btn btn-danger">🔒 Lockdown All Main Doors</button>
+    </form>
+  </div>
+  <div class="section mb-4">
+    <h2>Door Control</h2>
+    <form action="/locks/open" method="POST" class="mb-2">
+      <div class="input-group">
+        <input type="number" class="form-control" name="lockId" placeholder="Lock ID" required />
+        <button type="submit" class="btn btn-success">Open Door</button>
+      </div>
+    </form>
+    <form action="/locks/lock" method="POST">
+      <div class="input-group">
+        <input type="number" class="form-control" name="lockId" placeholder="Lock ID" required />
+        <button type="submit" class="btn btn-secondary">Lock Door</button>
+      </div>
     </form>
   </div>
   <div class="section">
@@ -26,18 +33,25 @@
     <% for(const r of recipients) { %>
       <div class="recipient">
         <strong><%= r.name %></strong>: <%= r.phone %>
-        <form action="/recipients/delete" method="POST" style="display:inline;">
+        <form action="/recipients/delete" method="POST" class="d-inline">
           <input type="hidden" name="phone" value="<%= r.phone %>" />
-          <button type="submit">Remove</button>
+          <button type="submit" class="btn btn-sm btn-link">Remove</button>
         </form>
       </div>
     <% } %>
     <h3>Add New Recipient</h3>
     <form action="/recipients/add" method="POST">
-      <label>Name:<br><input type="text" name="name" required /></label>
-      <label>Phone (E.164):<br><input type="text" name="phone" required placeholder="+15551234567" /></label>
-      <button type="submit">Add Recipient</button>
+      <div class="mb-2">
+        <label class="form-label">Name</label>
+        <input type="text" class="form-control" name="name" required />
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Phone (E.164)</label>
+        <input type="text" class="form-control" name="phone" placeholder="+15551234567" required />
+      </div>
+      <button type="submit" class="btn btn-primary">Add Recipient</button>
     </form>
   </div>
+  <a href="/events">View Event Log &raquo;</a>
 </body>
 </html>

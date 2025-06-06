@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Event Log</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css">
+</head>
+<body class="p-4">
+  <h1 class="mb-4">Event Log</h1>
+  <form class="mb-3" method="get" action="/events">
+    <div class="input-group">
+      <input type="text" class="form-control" name="q" placeholder="Search" value="<%= query %>" />
+      <button class="btn btn-primary" type="submit">Search</button>
+    </div>
+  </form>
+  <table class="table table-bordered table-sm">
+    <thead class="table-light">
+      <tr>
+        <th>Timestamp</th>
+        <th>Kind</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% for(const e of events) { %>
+        <tr>
+          <td><%= e.timestamp %></td>
+          <td><%= e.kind %></td>
+          <td><pre class="mb-0"><%= JSON.stringify(e, null, 2) %></pre></td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+  <a href="/">&laquo; Back to Dashboard</a>
+</body>
+</html>
