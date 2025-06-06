@@ -9,7 +9,8 @@ import path from "path";
 import Twilio from "twilio";
 
 const app = express();
-app.use(bodyParser.json({ verify: rawBodySaver }));  
+app.use(bodyParser.json({ verify: rawBodySaver }));
+app.use(bodyParser.urlencoded({ extended: true }));
 app.set("view engine", "ejs");
 app.use(expressLayout);
 // We need the raw body for HMAC. rawBodySaver attaches raw buffer to req.
@@ -25,6 +26,9 @@ const twClient = Twilio(TWILIO_SID, TWILIO_AUTH);
 
 // Path to our JSON config of recipients
 const RECIPIENTS_FILE = path.join(__dirname, "config", "recipients.json");
+
+// Track recent successful unlocks to detect door opens without a badge
+const recentUnlocks = new Map();
 
 // ── Helper to attach raw body ───────────────────────────────────────────────────
 function rawBodySaver(req, res, buf, encoding) {
@@ -174,17 +178,48 @@ app.post("/api/kisi/webhook", (req, res) => {
     return res.status(400).send("Invalid payload");
   }
 
-  // 3) If it’s an "unlock_failed" event → compose SMS
+  // Record successful unlocks
+  if (event.type === "lock.unlock" && event.success) {
+    recentUnlocks.set(event.object_id, Date.now());
+  }
+
+  // Access denied alert
   if (event.type === "lock.unlock_failed") {
     const who = event.actor_name || `ID ${event.actor_id}`;
     const door = event.object_name || `Lock ${event.object_id}`;
     const ts = event.created_at;
     const msg = `🚨 Access Denied: ${who} attempted to open "${door}" at ${ts}.`;
-
     console.log(msg);
     broadcastSms(msg).catch((err) => console.error("SMS broadcast error:", err));
   }
-  // 4) (Optional) Handle forced open / tamper here, see Section 3
+
+  // Forced open or tampered reader
+  if (event.type === "lock.force_open") {
+    const door = event.object_name || `Lock ${event.object_id}`;
+    const msg = `🚨 Forced Open detected on "${door}" at ${event.created_at}.`;
+    console.log(msg);
+    broadcastSms(msg);
+  }
+
+  if (event.type === "reader.tampered") {
+    const device = event.object_name || `Reader ${event.object_id}`;
+    const msg = `🚨 Tamper Alert: ${device} at ${event.created_at}.`;
+    console.log(msg);
+    broadcastSms(msg);
+  }
+
+  // Door opened event without prior unlock
+  if (event.type === "lock.open") {
+    const last = recentUnlocks.get(event.object_id) || 0;
+    if (Date.now() - last > 5000) {
+      const door = event.object_name || `Lock ${event.object_id}`;
+      const msg = `‼️ Door "${door}" opened without badge at ${event.created_at}.`;
+      console.log(msg);
+      broadcastSms(msg);
+    } else {
+      recentUnlocks.delete(event.object_id);
+    }
+  }
 
   // Always 200 OK so Kisi does not retry indefinitely
   res.status(200).send("OK");
