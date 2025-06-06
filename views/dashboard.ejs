@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kisi Security Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    h1 { margin-bottom: 1rem; }
+    .section { margin-bottom: 2rem; }
+    label { display: block; margin-bottom: 0.5rem; }
+    input { margin-bottom: 1rem; width: 300px; }
+    button { padding: 0.5rem 1rem; }
+    .recipient { margin: 0.5rem 0; }
+  </style>
+</head>
+<body>
+  <h1>Kisi Security Dashboard</h1>
+  <div class="section">
+    <h2>Lockdown Controls</h2>
+    <form action="/lockdown" method="POST">
+      <button type="submit" style="background-color:red;color:white;">🔒 Lockdown All Main Doors</button>
+    </form>
+  </div>
+  <div class="section">
+    <h2>SMS Recipients</h2>
+    <% for(const r of recipients) { %>
+      <div class="recipient">
+        <strong><%= r.name %></strong>: <%= r.phone %>
+        <form action="/recipients/delete" method="POST" style="display:inline;">
+          <input type="hidden" name="phone" value="<%= r.phone %>" />
+          <button type="submit">Remove</button>
+        </form>
+      </div>
+    <% } %>
+    <h3>Add New Recipient</h3>
+    <form action="/recipients/add" method="POST">
+      <label>Name:<br><input type="text" name="name" required /></label>
+      <label>Phone (E.164):<br><input type="text" name="phone" required placeholder="+15551234567" /></label>
+      <button type="submit">Add Recipient</button>
+    </form>
+  </div>
+</body>
+</html>
