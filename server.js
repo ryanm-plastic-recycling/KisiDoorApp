@@ -13,6 +13,8 @@ app.use(bodyParser.json({ verify: rawBodySaver }));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.set("view engine", "ejs");
 app.use(expressLayout);
+// Serve static assets like custom CSS
+app.use(express.static(path.join(__dirname, "public")));
 // We need the raw body for HMAC. rawBodySaver attaches raw buffer to req.
 
 const PORT = process.env.PORT || 3000;

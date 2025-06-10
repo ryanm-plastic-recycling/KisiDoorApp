@@ -1,0 +1,12 @@
+body {
+  background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+  min-height: 100vh;
+}
+
+.section {
+  margin-bottom: 2rem;
+}
+
+footer {
+  color: #666;
+}
