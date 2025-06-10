@@ -142,6 +142,21 @@ app.post("/locks/open", async (req, res) => {
   }
 });
 
+app.post("/locks/unlock", async (req, res) => {
+  const { lockId } = req.body;
+  if (!KISI_API_KEY || !lockId) return res.redirect("/");
+  try {
+    await TwilioFetch(`https://api.kisi.com/locks/${lockId}/unlock`, "POST", {
+      Authorization: `KISI-LOGIN ${KISI_API_KEY}`
+    });
+    addEvent({ kind: "action", action: "unlock", lockId });
+    res.redirect("/");
+  } catch (err) {
+    console.error("Unlock door error:", err);
+    res.status(500).send("Failed to unlock door");
+  }
+});
+
 app.post("/locks/lock", async (req, res) => {
   const { lockId } = req.body;
   if (!KISI_API_KEY || !lockId) return res.redirect("/");
